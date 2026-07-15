@@ -1,0 +1,2 @@
+/home/vboxuser/projects/LoRaSystem/STM32L051C8Tx_project_vscode/STM32L051C8Tx_slave/Core/Src/system_stm32l0xx.c:153:6:SystemInit	8	static
+/home/vboxuser/projects/LoRaSystem/STM32L051C8Tx_project_vscode/STM32L051C8Tx_slave/Core/Src/system_stm32l0xx.c:199:6:SystemCoreClockUpdate	32	static

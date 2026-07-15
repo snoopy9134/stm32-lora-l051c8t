@@ -1,0 +1,3 @@
+/home/vboxuser/projects/LoRaSystem/STM32L051C8Tx_project_vscode/STM32L051C8Tx_slave/Core/Src/spi.cpp:30:6:void MX_SPI2_Init()	8	static
+/home/vboxuser/projects/LoRaSystem/STM32L051C8Tx_project_vscode/STM32L051C8Tx_slave/Core/Src/spi.cpp:62:6:void HAL_SPI_MspInit(SPI_HandleTypeDef*)	48	static
+/home/vboxuser/projects/LoRaSystem/STM32L051C8Tx_project_vscode/STM32L051C8Tx_slave/Core/Src/spi.cpp:93:6:void HAL_SPI_MspDeInit(SPI_HandleTypeDef*)	16	static

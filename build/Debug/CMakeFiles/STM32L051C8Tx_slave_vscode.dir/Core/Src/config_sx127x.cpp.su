@@ -1,0 +1,6 @@
+/home/vboxuser/projects/LoRaSystem/STM32L051C8Tx_project_vscode/STM32L051C8Tx_slave/Core/Src/config_sx127x.cpp:4:6:bool init_SX127x(ConfigWrapper&)	32	static
+/home/vboxuser/projects/LoRaSystem/STM32L051C8Tx_project_vscode/STM32L051C8Tx_slave/Core/Src/config_sx127x.cpp:23:6:void sleep_mode(ConfigWrapper&)	16	static
+/home/vboxuser/projects/LoRaSystem/STM32L051C8Tx_project_vscode/STM32L051C8Tx_slave/Core/Src/config_sx127x.cpp:29:6:void standby_mode(ConfigWrapper&)	16	static
+/home/vboxuser/projects/LoRaSystem/STM32L051C8Tx_project_vscode/STM32L051C8Tx_slave/Core/Src/config_sx127x.cpp:35:6:void sendPacket(ConfigWrapper&, const uint8_t*, uint8_t)	40	static
+/home/vboxuser/projects/LoRaSystem/STM32L051C8Tx_project_vscode/STM32L051C8Tx_slave/Core/Src/config_sx127x.cpp:74:6:void sendPacketAM312(ConfigWrapper&, const uint8_t*, uint8_t)	40	static
+/home/vboxuser/projects/LoRaSystem/STM32L051C8Tx_project_vscode/STM32L051C8Tx_slave/Core/Src/config_sx127x.cpp:113:6:bool configureLoRa(ConfigWrapper&)	16	static
