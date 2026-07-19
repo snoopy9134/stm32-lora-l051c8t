@@ -1,5 +1,6 @@
 #include "config_sx127x.hpp"
 #include "config_wrapper.hpp"
+#include "protocol.hpp"
 
 bool init_SX127x(ConfigWrapper& cfg_f)
 {
@@ -23,13 +24,13 @@ bool init_SX127x(ConfigWrapper& cfg_f)
 void sleep_mode(ConfigWrapper& cfg_f)
 {
 
-	cfg_f.writeRegister(REG_OP_MODE, LONG_RANGE_MODE | MODE_SLEEP);
+	cfg_f.writeRegister(RADIOLIB_SX127X_REG_OP_MODE, RADIOLIB_SX127X_LORA | RADIOLIB_SX127X_SLEEP);
 }
 
 void standby_mode(ConfigWrapper& cfg_f)
 {
 
-	cfg_f.writeRegister(REG_OP_MODE, LONG_RANGE_MODE | MODE_STDBY);
+	cfg_f.writeRegister(RADIOLIB_SX127X_REG_OP_MODE, RADIOLIB_SX127X_LORA | RADIOLIB_SX127X_STANDBY);
 }
 
 void sendPacket(ConfigWrapper& cfg, const std::uint8_t* data, uint8_t length)
@@ -37,77 +38,93 @@ void sendPacket(ConfigWrapper& cfg, const std::uint8_t* data, uint8_t length)
 	uint32_t start = HAL_GetTick();
 
     // Standby mode
-    // cfg.writeRegister(0x01, 0x81);
+    cfg.writeRegister(RADIOLIB_SX127X_REG_OP_MODE, RADIOLIB_SX127X_LORA | RADIOLIB_SX127X_STANDBY);
 
     // FIFO pointer
-    cfg.writeRegister(0x0D, 0x00);
+    cfg.writeRegister(RADIOLIB_SX127X_REG_FIFO_ADDR_PTR, 0x00);
 
     // Write payload
     for(uint8_t i = 0; i < length; i++)
     {
-        cfg.writeRegister(0x00, data[i]);
+        cfg.writeRegister(RADIOLIB_SX127X_REG_FIFO, data[i]);
     }
 
     // Payload length = 1 byte
-    cfg.writeRegister(0x22, length);
+    cfg.writeRegister(RADIOLIB_SX127X_REG_PAYLOAD_LENGTH, length);
 
     // TX mode
-    cfg.writeRegister(0x01, 0x83);
-
-    // Toggle LED to confirm TX starts
-//    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+    cfg.writeRegister(RADIOLIB_SX127X_REG_OP_MODE, RADIOLIB_SX127X_LORA | RADIOLIB_SX127X_TX);
 
     // Wait TX done
-    while((cfg.readRegister(0x12) & 0x08) == 0) {
+    while((cfg.readRegister(RADIOLIB_SX127X_REG_IRQ_FLAGS) & RADIOLIB_SX127X_CLEAR_IRQ_FLAG_TX_DONE) == 0) {
         if((HAL_GetTick() - start) > 1000) {
             return;
         }
     }
 
-    // Toggle again to confirm TX completed
-//    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-
     // Clear IRQ flag
-    cfg.writeRegister(0x12, 0x08);
+    cfg.writeRegister(RADIOLIB_SX127X_REG_IRQ_FLAGS, RADIOLIB_SX127X_CLEAR_IRQ_FLAG_TX_DONE);
 }
 
-void sendPacketAM312(ConfigWrapper& cfg, const std::uint8_t* data, uint8_t length)
-{
-	uint32_t start = HAL_GetTick();
+bool waitForAck(ConfigWrapper& cfg,
+                uint32_t timeoutMs,
+                const uint8_t expectedCounter)
+{    
+    cfg.writeRegister(RADIOLIB_SX127X_REG_OP_MODE,
+                  RADIOLIB_SX127X_LORA | RADIOLIB_SX127X_RXSINGLE);
+    
+    uint32_t start = HAL_GetTick();
 
-    // Standby mode
-    cfg.writeRegister(0x01, 0x81);
-
-    // FIFO pointer
-    cfg.writeRegister(0x0D, 0x00);
-
-    // Write payload
-    for(uint8_t i = 0; i < length; i++)
+    while((HAL_GetTick() - start) < timeoutMs)
     {
-        cfg.writeRegister(0x00, data[i]);
-    }
+        uint8_t irq = cfg.readRegister(RADIOLIB_SX127X_REG_IRQ_FLAGS);
 
-    // Payload length = 1 byte
-    cfg.writeRegister(0x22, length);
+        if(irq & RADIOLIB_SX127X_CLEAR_IRQ_FLAG_RX_DONE)
+        {
+            return verifyAckData(cfg, expectedCounter);
+        }
 
-    // TX mode
-    cfg.writeRegister(0x01, 0x83);
-
-    // Toggle LED to confirm TX starts
-//    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-
-    // Wait TX done
-    while((cfg.readRegister(0x12) & 0x08) == 0) {
-        if((HAL_GetTick() - start) > 1000) {
-            return;
+        if (irq & RADIOLIB_SX127X_CLEAR_IRQ_FLAG_PAYLOAD_CRC_ERROR)
+        {
+            // Packet corrupted
         }
     }
 
-    // Toggle again to confirm TX completed
-//    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+    return false; // Timeout or no ACK received
+}
 
-    // Clear IRQ flag
-    cfg.writeRegister(0x12, 0x08);
+bool verifyAckData(ConfigWrapper& cfg, const uint8_t expectedCounter)
+{
+    std::size_t length = cfg.readRegister(RADIOLIB_SX127X_REG_RX_NB_BYTES);
+
+    if (length != sizeof(RxDataProtocol))
+    {
+        return false; // Unexpected packet size
+    }
+
+    uint8_t fifoAddr =
+    cfg.readRegister(RADIOLIB_SX127X_REG_FIFO_RX_CURRENT_ADDR);
+
+    cfg.writeRegister(RADIOLIB_SX127X_REG_FIFO_ADDR_PTR, fifoAddr);
+
+    std::uint8_t rxBuffer[sizeof(RxDataProtocol)] = {0};
+
+    for (std::size_t i = 0; i < length; i++)
+    {
+        rxBuffer[i] = cfg.readRegister(RADIOLIB_SX127X_REG_FIFO);
+    }
+
+    RxDataProtocol* rxData = reinterpret_cast<RxDataProtocol*>(rxBuffer);
+
+    if (rxData->version_major == VERSION_MAJOR && rxData->version_minor == VERSION_MINOR)
+    {
+        if (rxData->m_counter == expectedCounter)
+        {
+            return true; // ACK received with expected counter
+        }
+    }
+
+    return false;
 }
 
 bool configureLoRa(ConfigWrapper& cfg)

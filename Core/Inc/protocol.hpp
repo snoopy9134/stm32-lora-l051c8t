@@ -3,6 +3,10 @@
 
 #include <cstdint>
 
+//Software specific
+constexpr std::uint8_t VERSION_MAJOR = 0x01;
+constexpr std::uint8_t VERSION_MINOR = 0x00;
+
 enum class MessageType : std::uint8_t
 {
     MESSAGE,
@@ -51,6 +55,17 @@ class DataProtocol
         std::uint8_t m_crc;
         MessageType m_messageType;
         // std::uint8_t m_buffer[6];
+};
+
+struct RxDataProtocol
+{
+    std::uint8_t version_major;
+    std::uint8_t version_minor;
+    std::uint8_t m_slaveDeviceId;
+    std::uint8_t m_masterDeviceId;
+    std::uint8_t m_counter;
+    std::uint8_t m_crc;
+    MessageType m_messageType;
 };
 
 #endif /* PROTOCOL_HPP */

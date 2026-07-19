@@ -30,10 +30,6 @@ volatile std::uint8_t dummyCnt = 0;
 
 constexpr std::uint8_t DETECTION_TRIGGER = 0x03;
 
-//Software specific
-constexpr std::uint8_t VERSION_MAJOR = 0x01;
-constexpr std::uint8_t VERSION_MINOR = 0x00;
-
 // Device specific
 constexpr std::uint8_t DEVICE_ID = 0x01;
 
@@ -41,19 +37,6 @@ constexpr std::uint8_t DEVICE_ID = 0x01;
 DataProtocol dataProtocol(VERSION_MAJOR, VERSION_MINOR, DEVICE_ID);
 
 uint8_t dataBuffer[6];
-
-// payload data to be sent
-std::uint8_t chupi[8] =
-{
-    'c',
-    'h',
-    'u',
-    'p',
-    'i',
-    '0',
-    '0',
-    '\0'
-};
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -146,10 +129,6 @@ extern "C" int main(void)
     {
         while (1)  // ← ADD THIS!
         {
-            HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
-            HAL_Delay(500);
-            HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
-            HAL_Delay(500);
         }
 
     }
@@ -164,6 +143,15 @@ extern "C" int main(void)
   	  }
     }
 
+    // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
+    // HAL_Delay(1000);
+    // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
+    // HAL_Delay(1000);
+    // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
+    // HAL_Delay(1000);
+    // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
+    // HAL_Delay(1000);
+    
     [[maybe_unused]]bool sendValue = false;
 
     if(result_cfg_lora)
@@ -187,8 +175,6 @@ extern "C" int main(void)
 
             dataProtocol.setCounter(dummyCnt);
             dataProtocol.setMessageType(MessageType::MESSAGE);
-  			    // chupi[6] = tx_counter;
-            //chupi[6] = dummyCnt;
 
             dataProtocol.serialize(dataBuffer);
 
@@ -196,7 +182,21 @@ extern "C" int main(void)
             standby_mode(cfg);
 
             sendPacket(cfg, dataBuffer, sizeof(dataBuffer));
-  			    //sendPacketAM312(cfg, chupi, 8);
+
+            uint32_t rxTimeout = 300;
+
+            if(waitForAck(cfg, rxTimeout, dummyCnt))
+            {
+              // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_6);
+  			      // HAL_Delay(500);
+              // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_6);
+  			      // HAL_Delay(500); 
+                // success
+            }
+            else
+            {
+                // retransmit
+            }
 
             // TxRx module to sleep
             sleep_mode(cfg);
