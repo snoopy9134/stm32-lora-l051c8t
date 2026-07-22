@@ -19,24 +19,31 @@
 /* Includes ------------------------------------------------------------------*/
 #include <gpio.hpp>
 #include <main.hpp>
+#include <adc.hpp>
 #include <spi.hpp>
+#include <lptim.hpp>
 #include "config_wrapper.hpp"
 #include "config_sx127x.hpp"
 #include "protocol.hpp"
 
 volatile bool pirDetected = false;
 volatile bool lowPowerMode = false;
+volatile bool lptimRunning = false;
 volatile std::uint8_t dummyCnt = 0;
+volatile uint8_t tx_counter = 0;
 
 constexpr std::uint8_t DETECTION_TRIGGER = 0x03;
 
 // Device specific
 constexpr std::uint8_t DEVICE_ID = 0x01;
 
+#define VREFINT_CAL_ADDR_PTR ((uint16_t*)0x1FF80078)
+
+
 // Create data instance to transmit
 DataProtocol dataProtocol(VERSION_MAJOR, VERSION_MINOR, DEVICE_ID);
 
-uint8_t dataBuffer[6];
+uint8_t dataBuffer[8];
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -106,6 +113,8 @@ extern "C" int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI2_Init();
+  MX_LPTIM1_Init();
+  MX_ADC_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -143,20 +152,20 @@ extern "C" int main(void)
   	  }
     }
 
-    // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
-    // HAL_Delay(1000);
-    // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
-    // HAL_Delay(1000);
-    // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
-    // HAL_Delay(1000);
-    // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
-    // HAL_Delay(1000);
+    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
+    HAL_Delay(1000);
+    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
+    HAL_Delay(1000);
+    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
+    HAL_Delay(1000);
+    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
+    HAL_Delay(1000);
     
     [[maybe_unused]]bool sendValue = false;
 
     if(result_cfg_lora)
     {
-  	   uint8_t tx_counter = 0;
+  	   
 
   	  while(1)
   	  {
@@ -165,16 +174,37 @@ extern "C" int main(void)
   		  if(pirDetected)
   		  {
 
-          tx_counter++;
+          pirDetected = false;
 
-  			  pirDetected = false;
+          // reset timer only is running and start again (rolling timer)
+          // with prescaled Div4 -> 5 seconds timeout
+          if (lptimRunning == true)
+          {
+              HAL_LPTIM_TimeOut_Stop_IT(&hlptim1);
+          }
+
+          HAL_LPTIM_TimeOut_Start_IT(&hlptim1, 0xFFFF, 46250);
+          lptimRunning = true;
+
+          tx_counter++;
 
           if(DETECTION_TRIGGER <= tx_counter)
           {
+
             tx_counter = 0;
+
+            HAL_LPTIM_TimeOut_Stop_IT(&hlptim1);
+            lptimRunning = false;
 
             dataProtocol.setCounter(dummyCnt);
             dataProtocol.setMessageType(MessageType::MESSAGE);
+
+             // trigger Vrefin measurement
+            uint16_t Vdd_measured = triggerVDDMeasurement();
+            uint16_t vrefint_cal = *VREFINT_CAL_ADDR_PTR;
+            uint32_t vdd_mV = (3000UL * vrefint_cal / Vdd_measured);
+            uint16_t voltage = static_cast<uint16_t>(vdd_mV);
+            dataProtocol.setVoltage(voltage);
 
             dataProtocol.serialize(dataBuffer);
 
@@ -187,11 +217,11 @@ extern "C" int main(void)
 
             if(waitForAck(cfg, rxTimeout, dummyCnt))
             {
-              // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_6);
-  			      // HAL_Delay(500);
-              // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_6);
-  			      // HAL_Delay(500); 
-                // success
+              HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_6);
+  			      HAL_Delay(500);
+              HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_6);
+  			      HAL_Delay(500); 
+              // success
             }
             else
             {
@@ -207,12 +237,9 @@ extern "C" int main(void)
           HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_2);
   			  HAL_Delay(100);  
 
-  			  if(!lowPowerMode)
-  			  {
-  				  enterStopMode();
-  			  }
-
   		  }
+
+  				enterStopMode();
 
   	  }
 
@@ -248,6 +275,16 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 }
 
+extern "C" void HAL_LPTIM_CompareMatchCallback(LPTIM_HandleTypeDef *hlptim)
+{
+  if (hlptim->Instance == LPTIM1)
+  {
+    // 5-second window expired
+    tx_counter = 0;
+    lptimRunning = false;
+  }
+}
+
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -256,6 +293,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /** Configure the main internal regulator output voltage
   */
@@ -264,7 +302,8 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_MSI;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.MSIState = RCC_MSI_ON;
   RCC_OscInitStruct.MSICalibrationValue = 0;
   RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_5;
@@ -284,6 +323,13 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_LPTIM1;
+  PeriphClkInit.LptimClockSelection = RCC_LPTIM1CLKSOURCE_LSI;
+
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }

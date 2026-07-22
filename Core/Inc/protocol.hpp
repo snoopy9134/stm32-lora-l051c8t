@@ -27,6 +27,8 @@ class DataProtocol
         void setCounter(std::uint8_t counter) { m_counter = counter; }
         void setCrc(std::uint8_t crc) { m_crc = crc; }
         void setMessageType(MessageType type) { m_messageType = type; }
+        void setVoltage(std::uint16_t voltage) { m_voltage = voltage; }
+
         const uint8_t* data() const
         {
             return reinterpret_cast<const uint8_t*>(this);
@@ -43,8 +45,10 @@ class DataProtocol
             buffer[1] = version_minor;
             buffer[2] = m_deviceId;
             buffer[3] = m_counter;
-            buffer[4] = m_crc;
-            buffer[5] = static_cast<uint8_t>(m_messageType);
+            buffer[4] = static_cast<uint8_t>((m_voltage & 0xFF00)>>8);
+            buffer[5] = static_cast<uint8_t>(m_voltage & 0x00FF);
+            buffer[6] = m_crc;
+            buffer[7] = static_cast<uint8_t>(m_messageType);
         }
 
     private:
@@ -52,6 +56,7 @@ class DataProtocol
         std::uint8_t version_minor;
         std::uint8_t m_deviceId;
         std::uint8_t m_counter;
+        std::uint16_t m_voltage;
         std::uint8_t m_crc;
         MessageType m_messageType;
         // std::uint8_t m_buffer[6];
