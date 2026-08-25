@@ -13,6 +13,7 @@ enum class MessageType : std::uint8_t
     RESPONSE
 };
 
+// Data protocol to be sent from slave to master
 class DataProtocol
 {
     public:
@@ -59,9 +60,11 @@ class DataProtocol
         std::uint16_t m_voltage;
         std::uint8_t m_crc;
         MessageType m_messageType;
-        // std::uint8_t m_buffer[6];
+        // in case additional data introduced to protocol, 
+        // uint8_t dataBuffer[8] has to get updated as well
 };
 
+// Data protocol to be received from master by slave
 struct RxDataProtocol
 {
     std::uint8_t version_major;

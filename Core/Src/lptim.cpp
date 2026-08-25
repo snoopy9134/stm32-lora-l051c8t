@@ -18,7 +18,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <lptim.hpp>
+#include "lptim.hpp"
 
 /* USER CODE BEGIN 0 */
 

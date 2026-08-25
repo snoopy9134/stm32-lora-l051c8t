@@ -18,7 +18,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <adc.hpp>
+#include "adc.hpp"
 
 /* USER CODE BEGIN 0 */
 

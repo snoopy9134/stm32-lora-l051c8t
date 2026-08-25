@@ -17,11 +17,11 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <gpio.hpp>
-#include <main.hpp>
-#include <adc.hpp>
-#include <spi.hpp>
-#include <lptim.hpp>
+#include "gpio.hpp"
+#include "main.hpp"
+#include "adc.hpp"
+#include "spi.hpp"
+#include "lptim.hpp"
 #include "config_wrapper.hpp"
 #include "config_sx127x.hpp"
 #include "protocol.hpp"
@@ -37,6 +37,7 @@ constexpr std::uint8_t DETECTION_TRIGGER = 0x03;
 // Device specific
 constexpr std::uint8_t DEVICE_ID = 0x01;
 
+// cliabrated reference value for VREFINT (voltage measurements)
 #define VREFINT_CAL_ADDR_PTR ((uint16_t*)0x1FF80078)
 
 
