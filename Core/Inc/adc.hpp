@@ -44,6 +44,8 @@ void MX_ADC_Init(void);
 
 uint16_t triggerVDDMeasurement();
 
+uint16_t getVDD();
+
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

@@ -24,6 +24,9 @@
 
 /* USER CODE END 0 */
 
+// cliabrated reference value for VREFINT (voltage measurements)
+#define VREFINT_CAL_ADDR_PTR ((uint16_t*)0x1FF80078)
+
 ADC_HandleTypeDef hadc;
 
 /* ADC init function */
@@ -133,6 +136,16 @@ uint16_t triggerVDDMeasurement()
 
   return adc;
 
+}
+
+uint16_t getVDD()
+{
+    uint16_t Vdd_measured = triggerVDDMeasurement();
+    uint16_t vrefint_cal = *VREFINT_CAL_ADDR_PTR;
+    uint32_t vdd_mV = (3000UL * vrefint_cal / Vdd_measured);
+    uint16_t voltage = static_cast<uint16_t>(vdd_mV);
+
+    return voltage;
 }
 /* USER CODE END 1 */
 

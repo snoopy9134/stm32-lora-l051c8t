@@ -37,13 +37,11 @@ constexpr std::uint8_t DETECTION_TRIGGER = 0x03;
 // Device specific
 constexpr std::uint8_t DEVICE_ID = 0x01;
 
-// cliabrated reference value for VREFINT (voltage measurements)
-#define VREFINT_CAL_ADDR_PTR ((uint16_t*)0x1FF80078)
-
 
 // Create data instance to transmit
 DataProtocol dataProtocol(VERSION_MAJOR, VERSION_MINOR, DEVICE_ID);
 
+// buffer to transmit data to master with fixed size
 uint8_t dataBuffer[8];
 
 /* Private includes ----------------------------------------------------------*/
@@ -177,18 +175,28 @@ extern "C" int main(void)
 
           pirDetected = false;
 
-          // reset timer only is running and start again (rolling timer)
-          // with prescaled Div4 -> 5 seconds timeout
+
+          // As soon as PIR detected, start a 5-second window to expect
+          // next trigger from PIR sensor. If trigger received within 5 seconds,  
+          // reset counter and start again (rolling timer) and wait for next detection. 
+          // After 3 detections (tx_counter==3) we fullfilled our debouncing rule and send 
+          // data to master.         
+          // In case no consecutive PIR signals received within 5 seconds windos
+          // reset tx_counter==0 and wait for next detection.
+          // prescaled Div4 -> 5 seconds timeout
           if (lptimRunning == true)
           {
+              //timer must be stopped before restart
               HAL_LPTIM_TimeOut_Stop_IT(&hlptim1);
           }
 
+          // restart timer
           HAL_LPTIM_TimeOut_Start_IT(&hlptim1, 0xFFFF, 46250);
           lptimRunning = true;
 
           tx_counter++;
 
+          // 3 detection triggered within 5 seconds window each
           if(DETECTION_TRIGGER <= tx_counter)
           {
 
@@ -200,12 +208,8 @@ extern "C" int main(void)
             dataProtocol.setCounter(dummyCnt);
             dataProtocol.setMessageType(MessageType::MESSAGE);
 
-             // trigger Vrefin measurement
-            uint16_t Vdd_measured = triggerVDDMeasurement();
-            uint16_t vrefint_cal = *VREFINT_CAL_ADDR_PTR;
-            uint32_t vdd_mV = (3000UL * vrefint_cal / Vdd_measured);
-            uint16_t voltage = static_cast<uint16_t>(vdd_mV);
-            dataProtocol.setVoltage(voltage);
+            // trigger Vrefin measurement
+            dataProtocol.setVoltage(getVDD());
 
             dataProtocol.serialize(dataBuffer);
 
@@ -253,6 +257,7 @@ extern "C" int main(void)
     }
 }
 
+// Low power mode
 void enterStopMode()
 {
 	lowPowerMode = true;
@@ -268,6 +273,7 @@ void enterStopMode()
 	lowPowerMode = false;
 }
 
+// PIR interrupt callback
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == GPIO_PIN_1)
@@ -276,6 +282,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	}
 }
 
+// LPTIM timeout callback
 extern "C" void HAL_LPTIM_CompareMatchCallback(LPTIM_HandleTypeDef *hlptim)
 {
   if (hlptim->Instance == LPTIM1)
